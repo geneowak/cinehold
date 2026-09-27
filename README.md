@@ -16,7 +16,7 @@ Cinehold is a complete REST backend for a movie ticket reservation system, built
 [Movie Reservation System](https://roadmap.sh/projects/movie-reservation-system) spec.
 Users browse what's playing, hold a seat while they decide, and convert that hold into a
 booking; admins manage the catalogue of movies, locations, cinemas, seat maps and
-showtimes. All 22 endpoints are implemented.
+showtimes. All 23 endpoints are implemented.
 
 The part that shaped the design is what happens when two people want the same seat at the
 same time.
@@ -34,6 +34,10 @@ same time.
   instances are running.
 - **Abandoned hold recovery** — holds expire after 10 minutes and are reclaimed lazily on
   the next reservation attempt for that seat, so no background sweeper is required.
+- **Live seat availability** — a showtime reports the seats that are sold or currently held,
+  so a frontend can poll it and grey out the ones nobody can buy. The seat map itself is
+  static per cinema, so the UI needs one call for the layout and one cheap call for
+  availability.
 
 Every query is authored as SQL in `sql/queries` and compiled into type-safe Go by sqlc,
 and the schema is migrated by goose. A malformed query fails at build time instead of in
@@ -174,10 +178,17 @@ curl "http://localhost:8080/api/movies?genre=Action" -H "Authorization: Bearer $
 curl "http://localhost:8080/api/movies?time=19:00" -H "Authorization: Bearer $TOKEN"
 ```
 
-Grab a `show_times` id out of that response, then hold a seat and convert the hold
-into a booking:
+Grab a `show_times` id out of that response. Check what a client would see when choosing a
+seat, then hold one and convert the hold into a booking:
 
 ```bash
+# the seat map, plus the seats nobody can currently select
+curl http://localhost:8080/api/show-times/<show-time-id> \
+  -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8080/api/show-times/<show-time-id>/booked-seats \
+  -H "Authorization: Bearer $TOKEN"
+# ["A:1","A:2","B:5"]
+
 # hold a seat for 10 minutes, returns a reservation id
 curl -X POST http://localhost:8080/api/seats/reserve \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
@@ -187,11 +198,10 @@ curl -X POST http://localhost:8080/api/seats/reserve \
 curl -X POST http://localhost:8080/api/seats/book \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"seat_reservations":["<reservation-id>"]}'
-
-# the admin analytics endpoint now counts it
-curl http://localhost:8080/api/show-times/<show-time-id> \
-  -H "Authorization: Bearer $TOKEN"
 ```
+
+Log in as `user@cinehold.test` instead and the showtime detail call drops the three
+analytics fields, since those are admin-only.
 
 > The `genre` filter matches JSON array elements exactly, so it is **case
 > sensitive** — `?genre=Action` returns results, `?genre=action` returns nothing.
@@ -231,7 +241,6 @@ Requires an access token belonging to a user with `is_admin = true`.
 | `GET` | `/api/admin/movies` | Every movie with its showtimes, for management. |
 | `PUT` | `/api/movies/{movieId}` | Update movie details. Rejected while the movie has ongoing showtimes. |
 | `DELETE` | `/api/movies/{movieId}` | Delete a movie. Rejected while the movie has ongoing showtimes. |
-| `GET` | `/api/show-times/{showTimeId}` | Showtime detail with capacity, bookings and revenue. |
 | `POST` | `/api/locations` | Create a location. |
 | `GET` | `/api/locations` | List all locations. |
 | `GET` | `/api/locations/{locationId}` | One location with its cinemas. |
@@ -246,6 +255,8 @@ Requires any valid access token.
 | --- | --- | --- |
 | `GET` | `/api/movies` | Movies currently showing, with their showtimes. Optional filters: `?genre=`, `?time=15:04`, `?date=2006-01-02`. |
 | `GET` | `/api/movies/{movieId}` | One movie with its showtimes. |
+| `GET` | `/api/show-times/{showTimeId}` | One showtime with its cinema and seat map. Admins additionally get capacity, bookings and revenue — see [Showtime detail](#showtime-detail). |
+| `GET` | `/api/show-times/{showTimeId}/booked-seats` | The seats nobody can select right now — sold, or held within the last 10 minutes. A bare array of seat numbers, meant to be polled. |
 | `POST` | `/api/seats/reserve` | Hold a seat for 10 minutes. `201` with the reservation. |
 | `POST` | `/api/seats/book` | Confirm previously held seats. |
 | `GET` | `/api/bookings` | The current user's confirmed bookings. |
@@ -277,10 +288,90 @@ When an access token expires, trade the refresh token for a new one. Refreshing 
 rotate the refresh token, and once a token has been revoked it is rejected on every
 subsequent refresh.
 
+### Showtime detail
+
+`GET /api/show-times/{showTimeId}` is the one endpoint whose response depends on who is
+asking. Everyone gets the showtime and the cinema it plays in, including the full seat map,
+because a user needs the layout to pick a seat. Admins get three extra fields describing
+how that screening is selling.
+
+```jsonc
+// any signed-in user
+{
+  "id": "0192...",
+  "start_time": "2000-01-01T14:00:00Z",   // see the note below
+  "price": 25000,
+  "description": "matinee",
+  "price_currency": "UGX",
+  "movie_id": "0192...",
+  "cinema_id": "0192...",
+  "experience_type": "2D",
+  "start_date": "2026-09-27T00:00:00Z",
+  "end_date": "2026-10-27T00:00:00Z",
+  "created_at": "2026-09-27T09:17:27Z",
+  "updated_at": "2026-09-27T09:17:27Z",
+  "cinema": {
+    "id": "0192...",
+    "location_id": "0192...",
+    "name": "Screen 1",
+    "experience_types": ["2D", "3D"],
+    "seat_map": { "rows": [ /* ... */ ], "total_seats": 24, "screen": "center" }
+  }
+
+  // admins additionally get:
+  // "cinema_capacity": 24,
+  // "current_bookings": 3,
+  // "current_revenue": 75000
+}
+```
+
+`start_time` comes back as a full timestamp with a year of `2000` because the column is
+Postgres `time`, which has no date, and pgx scans it into a `time.Time`. The `14:00` in
+the example is the part that matters; the rest is an artefact of the round trip.
+
+The revenue figure is gross and assumes every booking is a completed sale — it counts
+`booked` rows and multiplies by the showtime price, so it ignores refunds, which don't
+exist yet.
+
+### Checking which seats are gone
+
+`GET /api/show-times/{showTimeId}/booked-seats` exists so a frontend can grey out seats
+while someone is picking. It's a separate call from the showtime detail above because the
+seat map is static per cinema and this part changes constantly — poll it, don't refetch
+the layout.
+
+```bash
+curl http://localhost:8080/api/show-times/$SHOW_TIME_ID/booked-seats \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```jsonc
+["A:1", "A:2", "B:5"]   // a bare array of seat numbers
+```
+
+A seat appears in that list if it is sold, or if someone is holding it and the hold is
+younger than 10 minutes. A hold that has just lapsed disappears from the list, because
+it's free again — the next person to reserve it takes it.
+
+That makes the endpoint and `POST /api/seats/reserve` agree exactly: anything this
+endpoint lists, the reserve call will reject. Both sides measure the 10 minutes from
+`reserved_at` with the same strict comparison, so they don't disagree at the boundary
+either.
+
+> A showtime with nothing reserved responds `200` with a `null` body rather than an empty
+> array, so a polling client needs a null check on every tick. See
+> [Things to fix](#things-to-fix).
+
 ### The seat flow
 
 This is the core of the API. A seat is *held* while the user decides, then *booked* once
 they commit.
+
+Before any of it, a client fetches `GET /api/show-times/{showTimeId}` for the seat map and
+then polls `GET /api/show-times/{showTimeId}/booked-seats` to grey out anything taken —
+both covered in [Showtime detail](#showtime-detail) and
+[Checking which seats are gone](#checking-which-seats-are-gone). What follows is the
+part that writes.
 
 **1. Hold a seat.** The response is the reservation you'll need to book it.
 
@@ -331,7 +422,9 @@ curl -X DELETE http://localhost:8080/api/bookings/$RESERVATION_ID -H "Authorizat
 
 **How long a hold lasts:** 10 minutes, counted from `reserved_at`. There is no background
 job expiring them — if a hold is stale, the next person to request that seat takes it, and
-the original hold is reassigned. A hold is not a booking until step 3 succeeds.
+the original hold is reassigned. A hold is not a booking until step 3 succeeds. That same
+10 minutes is what the availability endpoint reports on, so a lapsed hold shows up as
+selectable again in the UI before anyone has to claim it.
 
 ### Seat maps
 
@@ -505,6 +598,13 @@ existing row, and if `status = 'available'` but `reserved_at` is more than 10 mi
 it reassigns the row to the new user instead of failing. There's no cron job and no
 per-seat timer.
 
+The same 10-minute rule is what `GET /api/show-times/{showTimeId}/booked-seats` reports on,
+which means the 10 minutes is enforced in two places that have to agree: the reserve
+handler decides whether a seat can be taken, and the availability query decides whether the
+UI is allowed to offer it. Both measure from `reserved_at` and both use a strict
+comparison, so a seat is never simultaneously offered and rejected at the boundary. If one
+side is ever loosened, the other has to move with it.
+
 ### Domain invariants
 
 Two rules are enforced in the handlers because the database can't express them:
@@ -567,7 +667,7 @@ trait — every case starts from a clean slate without truncating tables between
 
 - [ ] Seat bookings should be handled in a db transaction so that all are rolled back in case of an error
 - [ ] The `genre` filter should be case insensitive. It matches JSON array elements with `@>`, so `?genre=Action` matches and `?genre=action` silently returns nothing
-- [ ] List endpoints should return `[]` rather than `null` when a filter matches no rows. `respondWithJSON` marshals a nil slice to `null`, so a client that does `data.map(...)` on an empty result throws
+- [ ] List endpoints should return `[]` rather than `null` when a filter matches no rows. `respondWithJSON` marshals a nil slice to `null`, so a client that does `data.map(...)` on an empty result throws. It bites hardest on `GET /api/show-times/{showTimeId}/booked-seats`, which a frontend is meant to poll every few seconds and has to null-check every time
 - [ ] Rename the `reservations` table to `bookings`, with `status` values of `pending` and `booked`. The structure can stay as it is, but `bookings` is the more intuitive name — right now routes say `/api/bookings` while the table behind them is called `reservations`, which is needlessly confusing
 - [ ] Change every `timestamp` column to `timestamptz` in UTC. This would have prevented the time-zone bug I hit while calculating how long a seat had been reserved; I patched it in `7a47fd6` by converting the `reservations` table, but that migration shouldn't have been necessary
 - [ ] Add pagination. No query uses `LIMIT`/`OFFSET`, so `GET /api/movies`, `GET /api/locations` and `GET /api/bookings` all return unbounded result sets
