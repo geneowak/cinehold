@@ -94,6 +94,6 @@ FROM
 WHERE
     (
         STATUS = 'booked'
-        OR reserved_at <= $2
+        OR reserved_at >= $2
     )
     AND show_time_id = $1;
