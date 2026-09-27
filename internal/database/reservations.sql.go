@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -99,6 +100,44 @@ func (q *Queries) GetReservationBySeatNo(ctx context.Context, arg GetReservation
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getShowTimeBookedSeats = `-- name: GetShowTimeBookedSeats :many
+SELECT
+    seat_no
+FROM
+    reservations
+WHERE
+    (
+        STATUS = 'booked'
+        OR reserved_at <= $2
+    )
+    AND show_time_id = $1
+`
+
+type GetShowTimeBookedSeatsParams struct {
+	ShowTimeID uuid.UUID  `json:"show_time_id"`
+	ReservedAt *time.Time `json:"reserved_at"`
+}
+
+func (q *Queries) GetShowTimeBookedSeats(ctx context.Context, arg GetShowTimeBookedSeatsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, getShowTimeBookedSeats, arg.ShowTimeID, arg.ReservedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var seat_no string
+		if err := rows.Scan(&seat_no); err != nil {
+			return nil, err
+		}
+		items = append(items, seat_no)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getShowTimeReservations = `-- name: GetShowTimeReservations :many

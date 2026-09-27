@@ -85,3 +85,15 @@ FROM
 WHERE
     show_time_id = $1
     AND STATUS = $2;
+
+-- name: GetShowTimeBookedSeats :many
+SELECT
+    seat_no
+FROM
+    reservations
+WHERE
+    (
+        STATUS = 'booked'
+        OR reserved_at <= $2
+    )
+    AND show_time_id = $1;
