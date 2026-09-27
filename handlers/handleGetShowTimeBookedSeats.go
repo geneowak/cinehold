@@ -1,13 +1,11 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/geneowak/cinehold/internal/database"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 /**
@@ -30,10 +28,6 @@ func (cfg *ApiConfig) handleGetShowTimeBookedSeats(w http.ResponseWriter, r *htt
 		ReservedAt: &timeLimit,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			respondWithError(w, http.StatusNotFound, "No bookings found", err)
-			return
-		}
 		respondWithError(w, http.StatusInternalServerError, "Error fetching booked seats", err)
 		return
 	}
