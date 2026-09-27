@@ -24,7 +24,7 @@ func (cfg *ApiConfig) handleGetShowTimeBookedSeats(w http.ResponseWriter, r *htt
 		return
 	}
 
-	timeLimit := time.Now().Add(10 * time.Minute)
+	timeLimit := time.Now().Add(-10 * time.Minute)
 	bookedSeats, err := cfg.DB.GetShowTimeBookedSeats(r.Context(), database.GetShowTimeBookedSeatsParams{
 		ShowTimeID: showTimeId,
 		ReservedAt: &timeLimit,
