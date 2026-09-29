@@ -15,3 +15,10 @@ func newTestApiConfig(querier database.Querier) *ApiConfig {
 
 	return &cfg
 }
+
+func newTestApiConfigWithPool(querier database.Querier, pool TxBeginner) *ApiConfig {
+	cfg := newTestApiConfig(querier)
+	cfg.Pool = pool
+
+	return cfg
+}

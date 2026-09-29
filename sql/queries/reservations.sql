@@ -46,6 +46,7 @@ SET
 WHERE
     id = $1
     AND user_id = $2
+    AND STATUS = 'available'
 RETURNING
     *;
 

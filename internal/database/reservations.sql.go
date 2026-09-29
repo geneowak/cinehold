@@ -267,6 +267,7 @@ SET
 WHERE
     id = $1
     AND user_id = $2
+    AND STATUS = 'available'
 RETURNING
     id, show_time_id, user_id, seat_no, status, reserved_at, created_at, updated_at
 `

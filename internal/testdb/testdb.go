@@ -73,10 +73,24 @@ func OpenAndMigrate(t *testing.T) *pgx.Conn {
 	return openConn
 }
 
+// TxBeginner is structurally identical to handlers.TxBeginner, so a Scope can be
+// passed straight to handlers that manage their own transaction.
+type TxBeginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+// pgx has no nested transactions, but pgx.Tx.Begin returns a pseudo nested
+// transaction backed by a savepoint. Delegating to it lets a handler manage its
+// own transaction while the test's outer transaction stays open for assertions.
+type txBeginner struct{ tx pgx.Tx }
+
+func (b txBeginner) Begin(ctx context.Context) (pgx.Tx, error) { return b.tx.Begin(ctx) }
+
 // bundles a transaction with a Queries instance bound to it
 type Scope struct {
-	Tx      pgx.Tx
-	Queries *database.Queries
+	Tx       pgx.Tx
+	Queries  *database.Queries
+	Beginner TxBeginner
 }
 
 /**
@@ -97,7 +111,8 @@ func Begin(t *testing.T, conn *pgx.Conn) Scope {
 	})
 
 	return Scope{
-		Tx:      tx,
-		Queries: database.New(tx),
+		Tx:       tx,
+		Queries:  database.New(tx),
+		Beginner: txBeginner{tx: tx},
 	}
 }

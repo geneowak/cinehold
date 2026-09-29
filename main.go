@@ -43,6 +43,7 @@ func main() {
 
 	cfg := handlers.ApiConfig{
 		DB:        database.New(db),
+		Pool:      db,
 		Platform:  platform,
 		JwtSecret: jwtSecret,
 	}
