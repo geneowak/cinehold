@@ -54,12 +54,10 @@ INSERT INTO
     users(
         id,
         email,
-        hashed_password,
-        created_at,
-        updated_at
+        hashed_password
     )
 VALUES
-    (uuidv7(), $1, $2, NOW(), NOW())
+    (uuidv7(), $1, $2)
 RETURNING
     id, email, is_admin, hashed_password, created_at, updated_at
 `
@@ -137,7 +135,8 @@ const updateUserAdminStatus = `-- name: UpdateUserAdminStatus :one
 UPDATE
     users
 SET
-    is_admin = $1
+    is_admin = $1,
+    updated_at = NOW()
 WHERE
     id = $2
 RETURNING
