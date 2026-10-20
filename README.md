@@ -90,7 +90,8 @@ cp .env.example .env
 Then fill in `.env`:
 
 ```ini
-DB_URL="postgres://postgres:postgres@localhost:5432/cinehold?sslmode=disable"
+DB_URL="postgres://postgres:postgres@localhost:5432/cinehold?sslmode=disable&timezone=UTC"
+TEST_DB_URL="postgres://postgres:@localhost:5432/cinehold_test?sslmode=disable&timezone=UTC"
 PLATFORM="dev"
 JWT_SECRET="<paste a long random string here>"
 PORT="8080"
@@ -104,7 +105,7 @@ openssl rand -base64 64
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DB_URL` | yes | pgx connection string. The server exits immediately if it's missing. |
+| `DB_URL` | yes | pgx connection string. The server exits immediately if it's missing. `timezone=UTC` is deliberate — every column is `timestamptz`, and pinning the session to UTC keeps timestamps round-tripping unchanged. |
 | `PLATFORM` | yes | Required by the config, though it isn't read anywhere yet. |
 | `JWT_SECRET` | yes | HS256 signing key for access tokens. |
 | `PORT` | no | Defaults to `8080`. |
@@ -713,7 +714,6 @@ and still assert against the outer transaction afterwards.
 - [ ] The `genre` filter should be case insensitive. It matches JSON array elements with `@>`, so `?genre=Action` matches and `?genre=action` silently returns nothing
 - [ ] List endpoints should return `[]` rather than `null` when a filter matches no rows. `respondWithJSON` marshals a nil slice to `null`, so a client that does `data.map(...)` on an empty result throws. It bites hardest on `GET /api/show-times/{showTimeId}/booked-seats`, which a frontend is meant to poll every few seconds and has to null-check every time
 - [ ] Rename the `reservations` table to `bookings`, with `status` values of `pending` and `booked`. The structure can stay as it is, but `bookings` is the more intuitive name — right now routes say `/api/bookings` while the table behind them is called `reservations`, which is needlessly confusing
-- [ ] Change every `timestamp` column to `timestamptz` in UTC. This would have prevented the time-zone bug I hit while calculating how long a seat had been reserved; I patched it in `7a47fd6` by converting the `reservations` table, but that migration shouldn't have been necessary
 - [ ] Add pagination. No query uses `LIMIT`/`OFFSET`, so `GET /api/movies`, `GET /api/locations` and `GET /api/bookings` all return unbounded result sets
 
 ### Deliberately out of scope
