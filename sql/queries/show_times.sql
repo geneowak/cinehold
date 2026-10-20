@@ -8,9 +8,7 @@ INSERT INTO
         cinema_id,
         experience_type,
         start_date,
-        end_date,
-        created_at,
-        updated_at
+        end_date
     )
 VALUES
     (
@@ -21,9 +19,7 @@ VALUES
         $4,
         $5,
         $6,
-        $7,
-        NOW(),
-        NOW()
+        $7
     )
 RETURNING
     *;
