@@ -8,9 +8,7 @@ INSERT INTO
         trailer_url,
         genre,
         pg_rating,
-        experience_types,
-        created_at,
-        updated_at
+        experience_types
     )
 VALUES
     (
@@ -21,9 +19,7 @@ VALUES
         $4,
         $5,
         $6,
-        $7,
-        NOW(),
-        NOW()
+        $7
     )
 RETURNING
     *;
