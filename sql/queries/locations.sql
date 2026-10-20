@@ -4,12 +4,10 @@ INSERT INTO
         id,
         name,
         address,
-        google_map_url,
-        created_at,
-        updated_at
+        google_map_url
     )
 VALUES
-    (uuidv7(), $1, $2, $3, NOW(), NOW())
+    (uuidv7(), $1, $2, $3)
 RETURNING
     *;
 
