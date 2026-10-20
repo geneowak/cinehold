@@ -2,7 +2,7 @@
 ALTER TABLE
     movies
 ADD
-    COLUMN poster_image_url text;
+    COLUMN poster_image_url TEXT;
 
 -- +goose Down
 ALTER TABLE

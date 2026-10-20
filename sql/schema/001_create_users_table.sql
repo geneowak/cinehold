@@ -1,12 +1,12 @@
 -- +goose Up
 CREATE TABLE users(
-    id uuid PRIMARY KEY,
-    email varchar(255) NOT NULL,
-    is_admin bool NOT NULL DEFAULT false,
-    hashed_password text NOT NULL,
-    created_at timestamp NOT NULL,
-    updated_at timestamp NOT NULL
+    id UUID PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    is_admin BOOL NOT NULL DEFAULT false,
+    hashed_password TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- +goose Down
-DROP TABLE users;
+DROP TABLE users CASCADE;

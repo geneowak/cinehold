@@ -1,15 +1,15 @@
 -- +goose Up
 CREATE TABLE movies(
-    id uuid PRIMARY KEY,
-    name varchar(255) NOT NULL,
-    description text NOT NULL,
-    duration_in_mins int NOT NULL,
-    trailer_url text NOT NULL,
-    genre text NOT NULL,
-    pg_rating varchar(255) NOT NULL,
-    experience_types text NOT NULL,
-    created_at timestamp NOT NULL,
-    updated_at timestamp NOT NULL
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    duration_in_mins INT NOT NULL,
+    trailer_url TEXT NOT NULL,
+    genre TEXT NOT NULL,
+    pg_rating VARCHAR(255) NOT NULL,
+    experience_types TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- +goose Down

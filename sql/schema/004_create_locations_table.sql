@@ -1,11 +1,11 @@
 -- +goose Up
 CREATE TABLE locations(
-    id uuid PRIMARY KEY,
-    name varchar(255) NOT NULL,
-    address text NOT NULL,
-    google_map_url text NOT NULL,
-    created_at timestamp NOT NULL,
-    updated_at timestamp NOT NULL
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    address TEXT NOT NULL,
+    google_map_url TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- +goose Down
