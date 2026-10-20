@@ -144,7 +144,8 @@ id and `ON CONFLICT DO NOTHING`, so a second run is a no-op rather than a
 duplicate key error.
 
 It creates two throwaway accounts, one location, two cinemas, three movies,
-three showtimes and three existing bookings:
+three showtimes, three existing bookings, and one live seat hold that expires
+10 minutes after the first time the seed runs:
 
 | Email | Password | Admin |
 | --- | --- | --- |
@@ -188,7 +189,7 @@ curl http://localhost:8080/api/show-times/<show-time-id> \
   -H "Authorization: Bearer $TOKEN"
 curl http://localhost:8080/api/show-times/<show-time-id>/booked-seats \
   -H "Authorization: Bearer $TOKEN"
-# ["A:1","A:2","B:5"]
+# ["A:1","A:2","B:5","B:3"]   // B:3 is the seeded hold — gone 10 minutes after seeding
 
 # hold a seat for 10 minutes, returns a reservation id
 curl -X POST http://localhost:8080/api/seats/reserve \
@@ -347,7 +348,7 @@ curl http://localhost:8080/api/show-times/$SHOW_TIME_ID/booked-seats \
 ```
 
 ```jsonc
-["A:1", "A:2", "B:5"]   // a bare array of seat numbers
+["A:1", "A:2", "B:5", "B:3"]   // a bare array of seat numbers; B:3 is the seeded hold
 ```
 
 A seat appears in that list if it is sold, or if someone is holding it and the hold is
@@ -754,10 +755,12 @@ Contributions are welcome — issues, bug reports, and pull requests.
 cp .env.testing.example .env.testing   # required
 ```
 
-Then set `TEST_DB_URL` in `.env.testing` to a **separate, throwaway** database. The test
-helpers run the real migrations and wrap every test in a transaction that is rolled back
-when the test finishes, so a test can never leave data behind — but pointing this at a
-database you care about is still a bad idea.
+Then set `TEST_DB_URL` in `.env.testing` to a **separate, throwaway** database, keeping
+the `timezone=UTC` parameter on the DSN so tests run in the same UTC session as the app
+does — `?date=` filters and seeded showtime dates are anchored to the session's midnight.
+The test helpers run the real migrations and wrap every test in a transaction that is
+rolled back when the test finishes, so a test can never leave data behind — but pointing
+this at a database you care about is still a bad idea.
 
 ```bash
 go test ./...

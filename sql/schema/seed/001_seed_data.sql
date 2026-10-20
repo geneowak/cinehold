@@ -15,10 +15,11 @@
 --
 -- Showtime dates are relative to CURRENT_DATE on purpose. GetShowingMovies filters
 -- on end_date >= CURRENT_DATE, so a hardcoded date would leave the seed quietly
--- unbookable once it passed. They are date-anchored rather than timestamped for a
--- second reason: the ?date= filter compares start_date against a parsed YYYY-MM-DD,
--- which is midnight, so a start_date of NOW() would sit at 17:44 and never match
--- a filter for its own day.
+-- unbookable once it passed. start_date and end_date are anchored at midnight rather
+-- than stamped with NOW() for a second reason: the ?date= filter compares start_date
+-- against a parsed YYYY-MM-DD, which is midnight, so a start_date of NOW() would sit
+-- at 17:44 and never match a filter for its own day. Both columns are TIMESTAMPTZ,
+-- so that midnight is UTC — which is what timezone=UTC in the DSN pins.
 
 -- +goose Up
 
@@ -27,42 +28,36 @@
 -- generated with fixed parameters rather than hashing.DefaultParams, whose
 -- Parallelism is runtime.NumCPU() and would differ per machine. CheckPasswordHash
 -- reads the parameters back out of the hash, so it verifies on any hardware.
-INSERT INTO users (id, email, is_admin, hashed_password, created_at, updated_at)
+INSERT INTO users (id, email, is_admin, hashed_password)
 VALUES
     (
         '00000000-0000-4000-8000-000000000001',
         'admin@cinehold.test',
         true,
-        '$argon2id$v=19$m=65536,t=3,p=4$3o8YhEDF7j3AW8FQ/z5wJw$Om6ZOQ8u3bQcTE5mZ8kNNSYy3roNFpEcoOiEYTwZeKk',
-        NOW(),
-        NOW()
+        '$argon2id$v=19$m=65536,t=3,p=4$3o8YhEDF7j3AW8FQ/z5wJw$Om6ZOQ8u3bQcTE5mZ8kNNSYy3roNFpEcoOiEYTwZeKk'
     ),
     (
         '00000000-0000-4000-8000-000000000002',
         'user@cinehold.test',
         false,
-        '$argon2id$v=19$m=65536,t=3,p=4$3o8YhEDF7j3AW8FQ/z5wJw$Om6ZOQ8u3bQcTE5mZ8kNNSYy3roNFpEcoOiEYTwZeKk',
-        NOW(),
-        NOW()
+        '$argon2id$v=19$m=65536,t=3,p=4$3o8YhEDF7j3AW8FQ/z5wJw$Om6ZOQ8u3bQcTE5mZ8kNNSYy3roNFpEcoOiEYTwZeKk'
     ) ON CONFLICT (id) DO NOTHING;
 
 -- Location -------------------------------------------------------------------
-INSERT INTO locations (id, name, address, google_map_url, created_at, updated_at)
+INSERT INTO locations (id, name, address, google_map_url)
 VALUES
     (
         '10000000-0000-4000-8000-000000000001',
         'Cinehold Grand Mall',
         '12 Reactor Road, Kampala',
-        'https://maps.google.com/?q=12+Reactor+Road+Kampala',
-        NOW(),
-        NOW()
+        'https://maps.google.com/?q=12+Reactor+Road+Kampala'
     ) ON CONFLICT (id) DO NOTHING;
 
 -- Cinemas --------------------------------------------------------------------
 -- Two auditoriums so the admin cinema list has something to show. Screen 1 is a
 -- conventional 3x8 layout; Screen 2 is smaller and mixes regular and vip seat
 -- types, which the API stores but does not yet price differently.
-INSERT INTO cinemas (id, location_id, name, experience_types, seat_map, created_at, updated_at)
+INSERT INTO cinemas (id, location_id, name, experience_types, seat_map)
 VALUES
     (
         '20000000-0000-4000-8000-000000000001',
@@ -92,9 +87,7 @@ VALUES
             ],
             "total_seats": 24,
             "screen": "center"
-        }'::jsonb,
-        NOW(),
-        NOW()
+        }'::jsonb
     ),
     (
         '20000000-0000-4000-8000-000000000002',
@@ -116,16 +109,14 @@ VALUES
             ],
             "total_seats": 12,
             "screen": "center"
-        }'::jsonb,
-        NOW(),
-        NOW()
+        }'::jsonb
     ) ON CONFLICT (id) DO NOTHING;
 
 -- Movies ---------------------------------------------------------------------
 -- genre and experience_types are JSON arrays stored in text columns, which is what
 -- the @> containment filter in GetShowingMovies runs against. Note that the match
 -- is case sensitive: ?genre=Action works, ?genre=action returns nothing.
-INSERT INTO movies (id, name, description, duration_in_mins, trailer_url, genre, pg_rating, experience_types, created_at, updated_at)
+INSERT INTO movies (id, name, description, duration_in_mins, trailer_url, genre, pg_rating, experience_types)
 VALUES
     (
         '30000000-0000-4000-8000-000000000001',
@@ -135,9 +126,7 @@ VALUES
         'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
         '["Action", "Sci-Fi"]',
         'PG-13',
-        '["2D", "3D"]',
-        NOW(),
-        NOW()
+        '["2D", "3D"]'
     ),
     (
         '30000000-0000-4000-8000-000000000002',
@@ -147,9 +136,7 @@ VALUES
         'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
         '["Drama"]',
         'PG',
-        '["2D"]',
-        NOW(),
-        NOW()
+        '["2D"]'
     ),
     (
         '30000000-0000-4000-8000-000000000003',
@@ -159,15 +146,13 @@ VALUES
         'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
         '["Comedy", "Romance"]',
         'PG-13',
-        '["2D", "IMAX"]',
-        NOW(),
-        NOW()
+        '["2D", "IMAX"]'
     ) ON CONFLICT (id) DO NOTHING;
 
 -- Showtimes ------------------------------------------------------------------
 -- Distinct start times so the ?time= filter is demonstrable: ?time=19:00 returns
 -- the 19:30 and 21:00 shows. Each run is an open date range starting today.
-INSERT INTO show_times (id, start_time, price, description, price_currency, movie_id, cinema_id, experience_type, start_date, end_date, created_at, updated_at)
+INSERT INTO show_times (id, start_time, price, description, price_currency, movie_id, cinema_id, experience_type, start_date, end_date)
 VALUES
     (
         '40000000-0000-4000-8000-000000000001',
@@ -179,9 +164,7 @@ VALUES
         '20000000-0000-4000-8000-000000000001',
         '2D',
         CURRENT_DATE,
-        CURRENT_DATE + INTERVAL '30 days',
-        NOW(),
-        NOW()
+        CURRENT_DATE + INTERVAL '30 days'
     ),
     (
         '40000000-0000-4000-8000-000000000002',
@@ -193,9 +176,7 @@ VALUES
         '20000000-0000-4000-8000-000000000001',
         '2D',
         CURRENT_DATE,
-        CURRENT_DATE + INTERVAL '30 days',
-        NOW(),
-        NOW()
+        CURRENT_DATE + INTERVAL '30 days'
     ),
     (
         '40000000-0000-4000-8000-000000000003',
@@ -207,16 +188,18 @@ VALUES
         '20000000-0000-4000-8000-000000000002',
         'IMAX',
         CURRENT_DATE,
-        CURRENT_DATE + INTERVAL '30 days',
-        NOW(),
-        NOW()
+        CURRENT_DATE + INTERVAL '30 days'
     ) ON CONFLICT (id) DO NOTHING;
 
--- Existing bookings ----------------------------------------------------------
+-- Existing bookings and one live hold -----------------------------------------
 -- Three seats already sold on the first showtime, owned by the non-admin user, so
 -- GET /api/show-times/{id} returns a non-zero occupancy and revenue and
 -- GET /api/bookings has something in it before you have touched anything.
-INSERT INTO reservations (id, show_time_id, user_id, seat_no, status, reserved_at, created_at, updated_at)
+-- B:3 is a live hold instead of a sale: it shows up in
+-- GET /api/show-times/{id}/booked-seats for 10 minutes after the first time the
+-- seed runs, then expires like a real hold would. Re-running the seed does not
+-- refresh it — ON CONFLICT DO NOTHING leaves reserved_at untouched.
+INSERT INTO reservations (id, show_time_id, user_id, seat_no, status, reserved_at)
 VALUES
     (
         '50000000-0000-4000-8000-000000000001',
@@ -224,9 +207,7 @@ VALUES
         '00000000-0000-4000-8000-000000000002',
         'A:1',
         'booked',
-        NULL,
-        NOW(),
-        NOW()
+        NULL
     ),
     (
         '50000000-0000-4000-8000-000000000002',
@@ -234,9 +215,7 @@ VALUES
         '00000000-0000-4000-8000-000000000002',
         'A:2',
         'booked',
-        NULL,
-        NOW(),
-        NOW()
+        NULL
     ),
     (
         '50000000-0000-4000-8000-000000000003',
@@ -244,8 +223,14 @@ VALUES
         '00000000-0000-4000-8000-000000000002',
         'B:5',
         'booked',
-        NULL,
-        NOW(),
+        NULL
+    ),
+    (
+        '50000000-0000-4000-8000-000000000004',
+        '40000000-0000-4000-8000-000000000001',
+        '00000000-0000-4000-8000-000000000002',
+        'B:3',
+        'available',
         NOW()
     ) ON CONFLICT (id) DO NOTHING;
 
@@ -254,7 +239,8 @@ VALUES
 DELETE FROM reservations WHERE id IN (
     '50000000-0000-4000-8000-000000000001',
     '50000000-0000-4000-8000-000000000002',
-    '50000000-0000-4000-8000-000000000003'
+    '50000000-0000-4000-8000-000000000003',
+    '50000000-0000-4000-8000-000000000004'
 );
 DELETE FROM show_times WHERE id IN (
     '40000000-0000-4000-8000-000000000001',
