@@ -39,12 +39,10 @@ INSERT INTO
         name,
         location_id,
         experience_types,
-        seat_map,
-        created_at,
-        updated_at
+        seat_map
     )
 VALUES
-    (uuidv7(), $1, $2, $3, $4, NOW(), NOW())
+    (uuidv7(), $1, $2, $3, $4)
 RETURNING
     id, location_id, name, experience_types, seat_map, created_at, updated_at
 `
