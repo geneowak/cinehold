@@ -19,12 +19,10 @@ INSERT INTO
         user_id,
         seat_no,
         show_time_id,
-        reserved_at,
-        created_at,
-        updated_at
+        reserved_at
     )
 VALUES
-    (uuidv7(), $1, $2, $3, NOW(), NOW(), NOW())
+    (uuidv7(), $1, $2, $3, NOW())
 RETURNING
     id, show_time_id, user_id, seat_no, status, reserved_at, created_at, updated_at
 `
@@ -263,7 +261,8 @@ UPDATE
     reservations
 SET
     STATUS = 'booked',
-    reserved_at = NULL
+    reserved_at = NULL,
+    updated_at = NOW()
 WHERE
     id = $1
     AND user_id = $2
@@ -298,7 +297,8 @@ UPDATE
     reservations
 SET
     user_id = $1,
-    reserved_at = NOW()
+    reserved_at = NOW(),
+    updated_at = NOW()
 WHERE
     seat_no = $2
     AND show_time_id = $3
